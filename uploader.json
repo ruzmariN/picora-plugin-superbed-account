@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 2,
+  "requires": [
+    "prepare",
+    "conditional-json-fields",
+    "credential-cache",
+    "response-conditions",
+    "credential-refresh"
+  ],
+  "permissions": {
+    "network": [
+      "www.superbed.cn"
+    ],
+    "readSelectedFile": true,
+    "allowInsecureHttp": false
+  },
+  "config": [
+    {
+      "key": "account",
+      "label": "聚合图床账号",
+      "type": "text",
+      "required": true,
+      "hint": "邮箱或用户名"
+    },
+    {
+      "key": "password",
+      "label": "账户密码",
+      "type": "secret",
+      "required": true,
+      "hint": "本地储存不会上传"
+    }
+  ],
+  "prepare": [
+    {
+      "id": "login",
+      "method": "POST",
+      "url": "https://www.superbed.cn/api/v1/auth/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "type": "json",
+        "fields": {
+          "password": "${config.password}",
+          "remember_me": false
+        },
+        "conditionalFields": [
+          {
+            "key": "email",
+            "value": "${config.account}",
+            "when": {
+              "config": "account",
+              "contains": "@"
+            }
+          },
+          {
+            "key": "username",
+            "value": "${config.account}",
+            "when": {
+              "config": "account",
+              "notContains": "@"
+            }
+          }
+        ]
+      },
+      "response": {
+        "successStatuses": [
+          200
+        ],
+        "errorMessage": "detail",
+        "exports": {
+          "accessToken": {
+            "path": "access_token",
+            "type": "string",
+            "secret": true
+          }
+        }
+      },
+      "cache": {
+        "ttlSeconds": 1800,
+        "refreshBeforeSeconds": 60
+      },
+      "followRedirects": false,
+      "timeoutSeconds": 30,
+      "errors": {
+        "401": "账号或密码错误，请检查聚合图床网页登录信息。",
+        "403": "账号登录被拒绝，请在聚合图床网页确认账号状态。",
+        "429": "登录请求过于频繁，请稍后重试。"
+      }
+    }
+  ],
+  "upload": {
+    "method": "POST",
+    "url": "https://www.superbed.cn/api/v1/upload/",
+    "headers": {
+      "Authorization": "Bearer ${steps.login.accessToken}",
+      "Accept": "application/json"
+    },
+    "body": {
+      "type": "multipart",
+      "fileField": "files"
+    },
+    "response": {
+      "url": "files[0].url",
+      "successStatuses": [
+        200
+      ],
+      "success": {
+        "path": "success",
+        "equals": true
+      },
+      "errorMessage": "message"
+    },
+    "refreshCredentials": {
+      "steps": [
+        "login"
+      ],
+      "statuses": [
+        401
+      ],
+      "maxAttempts": 1
+    },
+    "followRedirects": false,
+    "timeoutSeconds": 120,
+    "errors": {
+      "400": "图片或上传请求不符合聚合图床要求。",
+      "401": "登录已失效，请检查账号密码。",
+      "403": "上传被拒绝，请检查账号权限或免费额度。",
+      "413": "图片超过图床允许的大小。",
+      "429": "请求过于频繁，请稍后重试。",
+      "500": "聚合图床服务异常，请稍后重试。",
+      "502": "聚合图床网关异常，请稍后重试。",
+      "503": "聚合图床暂不可用，请稍后重试。"
+    }
+  }
+}
