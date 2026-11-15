@@ -19,6 +19,7 @@
       "key": "account",
       "label": "聚合图床账号",
       "type": "text",
+      "role": "account",
       "required": true,
       "hint": "邮箱或用户名"
     },
